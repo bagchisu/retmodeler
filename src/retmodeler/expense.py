@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Sequence
+from typing import Optional, Sequence
 from retmodeler.asset import Asset
 
 class TimePeriod(Enum):
@@ -19,15 +19,17 @@ class Expense:
   period:TimePeriod=TimePeriod.MONTHLY
   discretionary=False
 
-  def annual(self):
+  def annual(self) -> float:
     need = self.amount
     for source in self.sources:
-      if need > source.amount:
-        need -= source.amount
-        source.amount = 0
-      else:
-        source.amount -= need
-        need = 0
+      need = source.sell(need)
+      if not need:
         break
     self.amount += self.amount * self.annual_inflation
     return need
+  
+@dataclass
+class CalculatedExpense(Expense):
+  def annual(self, expense) -> float:
+    self.amount = expense
+    return super().annual()
