@@ -44,13 +44,16 @@ class Asset:
       self.shares += gain/self.share_price
     else:
       self.share_price += self.share_price * self.asset_class.annual_return
+    self.amount = self.shares * self.share_price
     remainder = gain
     if self.reinv_asset:
       for a,f in self.reinv_asset:
         a_buy = gain * f
+        if a != self:
+          self.sell(a_buy)
         a.buy(a_buy)
         remainder -= a_buy
-    self.buy(remainder)
+    assert(remainder>=0)
     return self._annual_taxable_withdrawals()
 
   def _annual_taxable_withdrawals(self) -> Tuple[float,float]:
