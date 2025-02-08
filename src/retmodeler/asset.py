@@ -28,6 +28,7 @@ class Asset:
   investment_type:InvestmentType
   asset_class:AssetClass
   reinv_asset:List[Tuple['Asset',float]]=field(default_factory=list)
+  savings_asset:Optional['Asset']=None
   annual_withdrawals=0
   annual_capital_gains=0
   share_price=1
@@ -56,12 +57,19 @@ class Asset:
         a.buy(a_buy)
         remainder -= a_buy
     assert(remainder>=0)
-    return self._annual_taxable_withdrawals(age)
-
-  def _annual_taxable_withdrawals(self, age) -> Tuple[float,float]:
+    self._required_minimum_distribution(age)
+    return self._annual_taxable_withdrawals()
+  
+  def _required_minimum_distribution(self, age):
     if self.investment_type.tax_deferred:
-        rmd_amount = rmd_uniform_lifetime(self.amount, age)
-        
+          rmd_amount = rmd_uniform_lifetime(self.amount, age)
+          rmd_amount -= self.annual_withdrawals
+          if rmd_amount > 0:
+            assert self.savings_asset, "Savings asset must be specified for assets incurring non-zero RMD"
+            self.sell(rmd_amount)
+            self.savings_asset.buy(rmd_amount)
+ 
+  def _annual_taxable_withdrawals(self) -> Tuple[float,float]:
     taxable_withdrawals = self.annual_withdrawals if self.investment_type.tax_deferred else 0
     taxable_capital_gains = 0
     if not self.investment_type.tax_deferred and not self.investment_type.tax_free:
