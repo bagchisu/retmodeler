@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import Iterable, List, Optional, Sequence, Tuple
 import numpy as np
 
+from retmodeler.rmd import rmd_uniform_lifetime
+
 @dataclass
 class InvestmentType:
   name:str
@@ -9,8 +11,8 @@ class InvestmentType:
   tax_free:bool # no tax on dividends and capital gain (roth)
 
 INV_BROKERAGE = InvestmentType('brokerage', False, False)
-INV_401K = InvestmentType('brokerage', True, False)
-INV_ROTH = InvestmentType('brokerage', False, True)
+INV_401K = InvestmentType('401k', True, False)
+INV_ROTH = InvestmentType('roth', False, True)
 
 @dataclass
 class AssetClass:
@@ -36,7 +38,7 @@ class Asset:
   def set_reinv_asset(self, asset:'Asset', fraction:float) -> None:
     self.reinv_asset.append((asset, fraction))
 
-  def annual(self) -> Tuple[float,float]:
+  def annual(self, age) -> Tuple[float,float]:
     self.annual_withdrawals = 0
     self.annual_capital_gains = 0
     gain = self.amount * self.asset_class.annual_return
@@ -54,9 +56,12 @@ class Asset:
         a.buy(a_buy)
         remainder -= a_buy
     assert(remainder>=0)
-    return self._annual_taxable_withdrawals()
+    return self._annual_taxable_withdrawals(age)
 
-  def _annual_taxable_withdrawals(self) -> Tuple[float,float]:
+  def _annual_taxable_withdrawals(self, age) -> Tuple[float,float]:
+    if self.investment_type.tax_deferred:
+        rmd_amount = rmd_uniform_lifetime(self.amount, age)
+        
     taxable_withdrawals = self.annual_withdrawals if self.investment_type.tax_deferred else 0
     taxable_capital_gains = 0
     if not self.investment_type.tax_deferred and not self.investment_type.tax_free:

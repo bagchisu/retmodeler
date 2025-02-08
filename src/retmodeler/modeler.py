@@ -8,7 +8,8 @@ import pandas as pd
 
 from retmodeler.asset import Asset
 from retmodeler.expense import Expense,CalculatedExpense
-from src.retmodeler.tax import TaxRate
+from retmodeler.tax import TaxRate
+from retmodeler.rmd import rmd_uniform_lifetime
 
 @dataclass
 class Model:
@@ -35,7 +36,7 @@ class Model:
         yearly_values[e.name].append(e.amount)
       # calculate and add this year's taxable withdrawals and asset growth
       for a in self.assets:
-        ti, cgi = a.annual()
+        ti, cgi = a.annual(y-self.birth_year)
         taxable_income += ti
         cg_taxable_income += cgi
         yearly_values[a.name].append(a.amount)
