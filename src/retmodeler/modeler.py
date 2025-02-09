@@ -7,15 +7,16 @@ import numpy as np
 import pandas as pd
 
 from retmodeler.asset import Asset
+from retmodeler.income import Income
 from retmodeler.expense import Expense,CalculatedExpense
 from retmodeler.tax import TaxRate
-from retmodeler.rmd import rmd_uniform_lifetime
 
 @dataclass
 class Model:
   birth_year:int
   ret_start_year: int
   assets: Sequence[Asset]
+  incomes: Sequence[Income]
   expenses: Sequence[Expense]
   tax_rate: TaxRate
   tax_expense:CalculatedExpense
@@ -30,6 +31,10 @@ class Model:
       deficit = self.tax_expense.annual(tax)
       taxable_income = 0
       cg_taxable_income = 0
+      # get and deposit the incomes
+      for i in self.incomes:
+        taxable_income += i.annual(y)
+        yearly_values[i.name].append(i.amount)
       # calculate and withdraw this year's expenses
       for e in self.expenses:
         deficit += e.annual()
