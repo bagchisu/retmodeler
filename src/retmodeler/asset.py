@@ -1,5 +1,5 @@
-from dataclasses import dataclass, field
-from typing import Iterable, List, Optional, Sequence, Tuple
+from dataclasses import dataclass
+from typing import Any, List, Mapping, Optional, Tuple
 import numpy as np
 
 from retmodeler.rmd import rmd_uniform_lifetime
@@ -27,63 +27,71 @@ class Asset:
   cost: float
   investment_type:InvestmentType
   asset_class:AssetClass
-  reinv_asset:List[Tuple['Asset',float]]=field(default_factory=list)
+  reinv_asset:List[Tuple['Asset',float]]
   savings_asset:Optional['Asset']=None
-  annual_withdrawals=0
-  annual_capital_gains=0
-  share_price=1
 
   def __post_init__(self):
-        self.shares = self.amount/self.share_price
+    self.annual_purchases=0
+    self.annual_withdrawals=0
+    self.annual_capital_gains=0
+    self.annual_gain=0
+    self.share_price=1
+    self.shares = self.amount/self.share_price
+    self.activity = []
 
-  def set_reinv_asset(self, asset:'Asset', fraction:float) -> None:
-    self.reinv_asset.append((asset, fraction))
-
-  def annual(self, age) -> Tuple[float,float]:
+  def annual(self, year, birthyear) -> Mapping[str,Any]:
+    self.annual_purchases=0
     self.annual_withdrawals = 0
     self.annual_capital_gains = 0
-    gain = self.amount * self.asset_class.annual_return
+    self.annual_gain = self.amount * self.asset_class.annual_return
     if self.asset_class.fixed_income:
-      self.shares += gain/self.share_price
+      self.shares += self.annual_gain/self.share_price
     else:
       self.share_price += self.share_price * self.asset_class.annual_return
     self.amount = self.shares * self.share_price
-    remainder = gain
+    remainder = self.annual_gain
     if self.reinv_asset:
       for a,f in self.reinv_asset:
-        a_buy = gain * f
+        a_buy = self.annual_gain * f
         if a != self:
-          self.sell(a_buy)
-        a.buy(a_buy)
+          self.sell(year, a_buy)
+        a.buy(year, a_buy)
         remainder -= a_buy
     assert(remainder>=0)
-    self._required_minimum_distribution(age)
-    return self._annual_taxable_withdrawals()
+    self._required_minimum_distribution(year, birthyear)
+    taxable_withdrawals, taxable_capital_gains = self._annual_taxable_withdrawals()
+    return dict(year=year, name=self.name, 
+                amount=self.amount, 
+                gain=self.annual_gain,
+                purchases=self.annual_purchases,
+                withdrawals=self.annual_withdrawals,
+                capital_gains=self.annual_capital_gains,
+                taxable_withdrawals=taxable_withdrawals, 
+                taxable_capital_gains=taxable_capital_gains)
   
-  def _required_minimum_distribution(self, age):
+  def _required_minimum_distribution(self, year, birthyear):
     if self.investment_type.tax_deferred:
-          rmd_amount = rmd_uniform_lifetime(self.amount, age)
+          rmd_amount = rmd_uniform_lifetime(self.amount, year-birthyear)
           rmd_amount -= self.annual_withdrawals
           if rmd_amount > 0:
             assert self.savings_asset, "Savings asset must be specified for assets incurring non-zero RMD"
-            self.sell(rmd_amount)
-            self.savings_asset.buy(rmd_amount)
+            self.sell(year, rmd_amount)
+            self.savings_asset.buy(year, rmd_amount)
  
   def _annual_taxable_withdrawals(self) -> Tuple[float,float]:
     taxable_withdrawals = self.annual_withdrawals if self.investment_type.tax_deferred else 0
     taxable_capital_gains = 0
     if not self.investment_type.tax_deferred and not self.investment_type.tax_free:
       taxable_capital_gains = self.annual_capital_gains
-    self.annual_withdrawals = 0
-    self.annual_capital_gains = 0
     return taxable_withdrawals, taxable_capital_gains
 
-  def buy(self, deposit_amount:float) ->  None:
+  def buy(self, year:int, deposit_amount:float) ->  None:
+    self.annual_purchases += deposit_amount
     self.cost += deposit_amount
     self.shares += deposit_amount/self.share_price
     self.amount += deposit_amount
 
-  def sell(self, expense_amount) -> float:
+  def sell(self, year:int, expense_amount) -> float:
     withdrawal_amount = min(expense_amount, self.amount)
     deficit = expense_amount - withdrawal_amount
     self.amount -= withdrawal_amount

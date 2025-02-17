@@ -16,13 +16,13 @@ class Expense:
   amount:float
   sources:Sequence[Asset]
   annual_inflation:float
-  period:TimePeriod=TimePeriod.MONTHLY
+  period:TimePeriod=TimePeriod.ANNUAL
   discretionary=False
 
-  def annual(self) -> float:
-    need = self.amount
+  def annual(self, year) -> float:
+    need = self.amount * self.period.value
     for source in self.sources:
-      need = source.sell(need)
+      need = source.sell(year, need)
       if not need:
         break
     self.amount += self.amount * self.annual_inflation
@@ -30,6 +30,6 @@ class Expense:
   
 @dataclass
 class CalculatedExpense(Expense):
-  def annual(self, expense) -> float:
+  def annual(self, year, expense) -> float:
     self.amount = expense
-    return super().annual()
+    return super().annual(year)
