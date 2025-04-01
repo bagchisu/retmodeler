@@ -25,6 +25,7 @@ class Model:
     self.yearly_income_statements = defaultdict(list)
     self.yearly_asset_statements = defaultdict(list)
     self.yearly_expense_statements = defaultdict(list)
+    self.yearly_deficit_statements = dict()
     self.yearly_tax_statements = defaultdict(list)
 
   def simulate(self, plan_to_age):
@@ -53,10 +54,13 @@ class Model:
         taxable_income += statement['taxable_withdrawals']
         cg_taxable_income += statement['taxable_capital_gains']
         self.yearly_asset_statements[y].append(statement)
-    return 
+      self.yearly_deficit_statements[y] = deficit
 
   def taxes_paid(self):
-    return self.total_taxes_paid
+    return self.yearly_tax_statements
   
   def asset_worth(self):
     return sum([a.amount for a in self.assets])
+  
+  def deficit_amount(self):
+    return sum(self.yearly_deficit_statements.values())
